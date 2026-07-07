@@ -16,7 +16,7 @@ if not exist backend\.env (
     echo.
 )
 
-echo [步骤1/4] 检查Python环境...
+echo [步骤1/3] 检查Python环境...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [错误] 未检测到Python，请先安装Python 3.8+
@@ -27,16 +27,8 @@ if %errorlevel% neq 0 (
 echo [成功] Python环境已就绪
 
 echo.
-echo [步骤2/4] 检查并安装后端依赖...
+echo [步骤2/3] 检查并安装后端依赖...
 cd backend
-if not exist venv (
-    echo [提示] 创建虚拟环境...
-    python -m venv venv
-    echo [成功] 虚拟环境创建完成
-)
-
-echo [提示] 激活虚拟环境并安装依赖...
-call venv\Scripts\activate
 pip install -r requirements.txt >nul 2>&1
 if %errorlevel% neq 0 (
     echo [警告] 部分依赖安装失败，请手动检查
@@ -45,24 +37,7 @@ echo [成功] 后端依赖安装完成
 cd ..
 
 echo.
-echo [步骤3/4] 检查并安装前端依赖...
-cd frontend
-if not exist node_modules (
-    echo [提示] 安装前端依赖...
-    npm install >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo [错误] npm安装失败，请检查网络连接
-        pause
-        exit /b 1
-    )
-    echo [成功] 前端依赖安装完成
-) else (
-    echo [提示] 前端依赖已存在，跳过安装
-)
-cd ..
-
-echo.
-echo [步骤4/4] 启动服务...
+echo [步骤3/3] 启动服务...
 echo [提示] 后端服务将在 http://localhost:8000 启动
 echo [提示] 前端服务将在 http://localhost:5173 启动
 echo.
@@ -70,7 +45,7 @@ echo [提示] 按 Ctrl+C 停止服务
 echo ================================================
 echo.
 
-start "" cmd /k "cd backend && call venv\Scripts\activate && echo [后端] 启动中... && python -m uvicorn app.main:app --reload"
+start "" cmd /k "cd backend && echo [后端] 启动中... && python -m uvicorn app.main:app --reload"
 timeout /t 3 /nobreak >nul
 start "" cmd /k "cd frontend && echo [前端] 启动中... && npm run dev"
 
