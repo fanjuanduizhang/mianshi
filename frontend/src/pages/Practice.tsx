@@ -1,6 +1,4 @@
-import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { api } from '@/services/api'
+import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Textarea'
@@ -18,55 +16,74 @@ import {
   Lightbulb,
 } from 'lucide-react'
 
+const API_BASE = '/api/v1'
+
 type TabType = 'practice' | 'collected' | 'review'
 
 export function Practice() {
   const [activeTab, setActiveTab] = useState<TabType>('practice')
-  const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [categories, setCategories] = useState<string[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [userAnswer, setUserAnswer] = useState('')
   const [showResult, setShowResult] = useState(false)
   const [questions, setQuestions] = useState<any[]>([])
   const [checkResult, setCheckResult] = useState<any>(null)
   const [isCollected, setIsCollected] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
-  const { data: categoriesData } = useQuery({
-    queryKey: ['practice-categories'],
-    queryFn: () => api.practice.getCategories(),
-  })
+  useEffect(() => {
+    fetch(`${API_BASE}/practice/categories`)
+      .then(res => res.json())
+      .then(data => {
+        setCategories(data.categories || [])
+      })
+      .catch(err => {
+        console.error('Failed to fetch categories:', err)
+      })
+  }, [])
 
-  const categories = categoriesData?.categories || []
-
-  const startPractice = useMutation({
-    mutationFn: (category: string) =>
-      api.practice.getQuestions({ category, count: 10 }),
-    onSuccess: (data) => {
-      console.log('Start practice success:', data)
+  const startPractice = async (category: string) => {
+    setIsLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/practice/questions?category=${encodeURIComponent(category)}&count=10`)
+      const data = await res.json()
+      console.log('Got questions:', data)
       if (data && data.length > 0) {
         setQuestions(data)
         setCurrentQuestionIndex(0)
         setUserAnswer('')
         setShowResult(false)
         setCheckResult(null)
+      } else {
+        alert('该分类下暂无题目')
       }
-    },
-    onError: (error) => {
-      console.error('Start practice error:', error)
-      alert('获取题目失败，请重试')
-    },
-  })
+    } catch (err) {
+      console.error('Failed to get questions:', err)
+      alert('获取题目失败，请检查后端服务是否启动')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-  const checkAnswer = useMutation({
-    mutationFn: () =>
-      api.practice.checkAnswer(
-        questions[currentQuestionIndex],
-        userAnswer
-      ),
-    onSuccess: (data) => {
+  const checkAnswer = async () => {
+    if (!userAnswer.trim()) {
+      alert('请先输入答案')
+      return
+    }
+    try {
+      const res = await fetch(`${API_BASE}/practice/check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: questions[currentQuestionIndex], user_answer: userAnswer })
+      })
+      const data = await res.json()
       setCheckResult(data)
       setShowResult(true)
-    },
-  })
+    } catch (err) {
+      console.error('Failed to check answer:', err)
+      alert('提交答案失败')
+    }
+  }
 
   const currentQuestion = questions[currentQuestionIndex]
 
@@ -92,7 +109,9 @@ export function Practice() {
     if (currentQuestion) {
       const newCollected = !isCollected
       setIsCollected(newCollected)
-      api.practice.toggleCollect(currentQuestion.id, newCollected)
+      fetch(`${API_BASE}/practice/collect/${currentQuestion.id}?collected=${newCollected}`, {
+        method: 'POST'
+      }).catch(err => console.error('Failed to toggle collect:', err))
     }
   }
 
@@ -129,21 +148,24 @@ export function Practice() {
         {activeTab === 'practice' && (
           <div className="grid grid-cols-3 gap-4">
             {categories.map((cat: string) => (
-              <Card
+              <button
                 key={cat}
-                className="cursor-pointer hover:shadow-md transition-shadow group"
-                onClick={() => startPractice.mutate(cat)}
+                onClick={() => startPractice(cat)}
+                disabled={isLoading}
+                className="w-full text-left cursor-pointer hover:shadow-md transition-shadow group"
               >
-                <Card.Content className="p-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">{cat}</h3>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    开始练习
-                  </p>
-                </Card.Content>
-              </Card>
+                <Card>
+                  <Card.Content className="p-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">{cat}</h3>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {isLoading ? '加载中...' : '开始练习'}
+                    </p>
+                  </Card.Content>
+                </Card>
+              </button>
             ))}
           </div>
         )}
@@ -215,9 +237,8 @@ export function Practice() {
               />
               <div className="flex justify-end">
                 <Button
-                  onClick={() => checkAnswer.mutate()}
-                  disabled={!userAnswer.trim() || checkAnswer.isPending}
-                  loading={checkAnswer.isPending}
+                  onClick={checkAnswer}
+                  disabled={!userAnswer.trim()}
                 >
                   <CheckCircle className="w-4 h-4" />
                   提交答案
@@ -329,10 +350,16 @@ export function Practice() {
 }
 
 function CollectedQuestions() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['collected-questions'],
-    queryFn: () => api.practice.getCollected(),
-  })
+  const [data, setData] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`${API_BASE}/practice/collected`)
+      .then(res => res.json())
+      .then(data => setData(data))
+      .catch(err => console.error('Failed to fetch collected:', err))
+      .finally(() => setIsLoading(false))
+  }, [])
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">加载中...</div>
@@ -367,10 +394,16 @@ function CollectedQuestions() {
 }
 
 function ReviewQuestions() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['review-questions'],
-    queryFn: () => api.practice.getReview(),
-  })
+  const [data, setData] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`${API_BASE}/practice/review`)
+      .then(res => res.json())
+      .then(data => setData(data))
+      .catch(err => console.error('Failed to fetch review:', err))
+      .finally(() => setIsLoading(false))
+  }, [])
 
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">加载中...</div>
@@ -394,7 +427,7 @@ function ReviewQuestions() {
           <Card.Content className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <Badge variant="outline">{q.category}</Badge>
-              <Badge variant="warning">复习 {q.review_count} 次</Badge>
+              <Badge variant="outline">复习 {q.review_count} 次</Badge>
             </div>
             <p className="text-sm font-medium">{q.question_id}</p>
           </Card.Content>
