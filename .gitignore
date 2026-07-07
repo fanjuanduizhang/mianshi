@@ -41,20 +41,13 @@ ENV/
 *.swo
 *~
 
-# Streamlit
-.streamlit/
-
 # Data files (generated)
-data/chromadb/
-data/job_hunter.db
-services/data/
-data/*.db
+backend/data/chromadb/
 *.sqlite3
 *.db
 
 # Resume uploads
-data/resumes/
-resumes/
+backend/data/resumes/
 
 # Logs
 *.log
@@ -72,5 +65,6 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Node modules (if any)
+# Node
 node_modules/
+frontend/dist/
