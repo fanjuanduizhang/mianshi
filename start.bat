@@ -7,16 +7,28 @@ echo          AI求职面试助手 - 一键启动
 echo ================================================
 echo.
 
-if not exist backend\.env (
-    echo [提示] 检测到 backend/.env 文件不存在
-    echo [提示] 正在从 .env.example 复制...
-    copy backend\.env.example backend\.env >nul
-    echo [成功] 已创建 backend/.env 文件
-    echo [提示] 请编辑 backend/.env 文件，填写你的 API Key
+echo [步骤1/4] 检查环境变量...
+if "%DEEPSEEK_API_KEY%"=="" if "%DASHSCOPE_API_KEY%"=="" (
+    echo [警告] 未检测到环境变量 DEEPSEEK_API_KEY 或 DASHSCOPE_API_KEY
+    echo [提示] 请先在系统环境变量中配置 API Key，例如：
     echo.
+    echo   PowerShell 临时设置（当前窗口）：
+    echo     $env:DEEPSEEK_API_KEY = "your_api_key"
+    echo     $env:DASHSCOPE_API_KEY = "your_api_key"
+    echo.
+    echo   PowerShell 永久设置：
+    echo     [Environment]::SetEnvironmentVariable("DEEPSEEK_API_KEY", "your_api_key", "User")
+    echo     [Environment]::SetEnvironmentVariable("DASHSCOPE_API_KEY", "your_api_key", "User")
+    echo.
+    echo   设置后需要重启终端生效。
+    echo.
+    pause
+    exit /b 1
 )
+echo [成功] 环境变量已配置
 
-echo [步骤1/3] 检查Python环境...
+echo.
+echo [步骤2/4] 检查Python环境...
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [错误] 未检测到Python，请先安装Python 3.8+
@@ -27,7 +39,7 @@ if %errorlevel% neq 0 (
 echo [成功] Python环境已就绪
 
 echo.
-echo [步骤2/3] 检查并安装后端依赖...
+echo [步骤3/4] 检查并安装后端依赖...
 cd backend
 pip install -r requirements.txt >nul 2>&1
 if %errorlevel% neq 0 (
@@ -37,7 +49,7 @@ echo [成功] 后端依赖安装完成
 cd ..
 
 echo.
-echo [步骤3/3] 启动服务...
+echo [步骤4/4] 启动服务...
 echo [提示] 后端服务将在 http://localhost:8000 启动
 echo [提示] 前端服务将在 http://localhost:5173 启动
 echo.
